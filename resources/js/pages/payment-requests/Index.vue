@@ -84,6 +84,10 @@ type PageProps = AppPageProps<{
     filters: {
         author_id: string | null;
         participant_id: string | null;
+        expense_type_id: string | null;
+        expense_category_id: string | null;
+        paid_account_id: string | null;
+        purchase_reference: string | null;
         ready_for_payment: string | null;
         paid: string | null;
         created_from: string | null;
@@ -101,8 +105,6 @@ type PageProps = AppPageProps<{
 const page = usePage<PageProps>();
 const props = computed(() => page.props);
 
-console.log(props.value.paymentRequests.data);
-
 
 const role = computed(() => props.value.auth.user.role);
 const isUser = computed(() => role.value === 'user');
@@ -116,6 +118,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 const filterForm = reactive({
     author_id: props.value.filters.author_id ?? '',
     participant_id: props.value.filters.participant_id ?? '',
+    expense_type_id: props.value.filters.expense_type_id ?? '',
+    expense_category_id: props.value.filters.expense_category_id ?? '',
+    paid_account_id: props.value.filters.paid_account_id ?? '',
+    purchase_reference: props.value.filters.purchase_reference ?? '',
     ready_for_payment: props.value.filters.ready_for_payment ?? '',
     paid: props.value.filters.paid ?? '',
     created_from: props.value.filters.created_from ?? '',
@@ -128,7 +134,6 @@ const isEditing = ref(false);
 const selected = ref<PaymentRequestRow | null>(null);
 const receiptMode = ref<'url' | 'file'>('url');
 const filtersOpen = ref(false);
-const columnsOpen = ref(false);
 const COLUMN_VISIBILITY_KEY = 'payment-requests.column-visibility';
 
 const columnVisibility = reactive({
@@ -362,6 +367,10 @@ const applyFilters = () => {
 const clearFilters = () => {
     filterForm.author_id = '';
     filterForm.participant_id = '';
+    filterForm.expense_type_id = '';
+    filterForm.expense_category_id = '';
+    filterForm.paid_account_id = '';
+    filterForm.purchase_reference = '';
     filterForm.ready_for_payment = '';
     filterForm.paid = '';
     filterForm.created_from = '';
@@ -407,10 +416,10 @@ const copyValue = async (value: unknown, label: string) => {
                             Облік заявок, зміни статусів та історія учасників.
                         </p>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <Collapsible v-model:open="filtersOpen">
                             <CollapsibleTrigger as-child>
-                                <Button variant="outline" type="button" class="gap-2">
+                                <Button variant="outline" size="sm" type="button" class="h-8 gap-1.5 px-3 text-xs">
                                     <Filter class="h-4 w-4" />
                                     Фільтри
                                     <ChevronDown
@@ -420,85 +429,104 @@ const copyValue = async (value: unknown, label: string) => {
                                 </Button>
                             </CollapsibleTrigger>
                         </Collapsible>
-                        <Collapsible v-model:open="columnsOpen">
-                            <CollapsibleTrigger as-child>
-                                <Button variant="outline" type="button" class="gap-2">
-                                    <Clipboard class="h-4 w-4" />
-                                    Колонки
-                                    <ChevronDown
-                                        class="h-4 w-4 transition-transform"
-                                        :class="columnsOpen ? 'rotate-180' : ''"
-                                    />
-                                </Button>
-                            </CollapsibleTrigger>
-                        </Collapsible>
-                        <Button v-if="props.permissions.create" @click="openCreate">Створити заявку</Button>
+                        <Button
+                            v-if="props.permissions.create"
+                            size="sm"
+                            class="h-8 px-3 text-xs"
+                            @click="openCreate"
+                        >
+                            Створити заявку
+                        </Button>
                     </div>
                 </div>
 
                 <Collapsible v-model:open="filtersOpen" class="mt-4">
                     <CollapsibleContent>
-                        <div class="grid gap-3 md:grid-cols-3">
-                            <div class="grid gap-2">
-                                <Label>Хто подав</Label>
-                                <select v-model="filterForm.author_id" class="h-8 rounded-md border border-input bg-transparent px-3 text-xs">
+                        <div class="mb-3 space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-3">
+                            <Label class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Видимість колонок</Label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button
+                                    v-for="col in columnItems"
+                                    :key="col.key"
+                                    type="button"
+                                    class="rounded-md border px-2 py-1 text-[11px] leading-none transition-colors"
+                                    :class="columnVisibility[col.key] ? 'border-primary text-primary' : 'border-input text-muted-foreground'"
+                                    @click="columnVisibility[col.key] = !columnVisibility[col.key]"
+                                >
+                                    {{ columnVisibility[col.key] ? '✓' : '○' }} {{ col.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Хто подав</Label>
+                                <select v-model="filterForm.author_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
                                     <option value="">Усі</option>
                                     <option v-for="user in props.users" :key="user.id" :value="String(user.id)">{{ user.name }}</option>
                                 </select>
                             </div>
-                            <div class="grid gap-2">
-                                <Label>Учасник</Label>
-                                <select v-model="filterForm.participant_id" class="h-8 rounded-md border border-input bg-transparent px-3 text-xs">
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Учасник</Label>
+                                <select v-model="filterForm.participant_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
                                     <option value="">Усі</option>
                                     <option v-for="user in props.users" :key="user.id" :value="String(user.id)">{{ user.name }}</option>
                                 </select>
                             </div>
-                            <div class="grid gap-2">
-                                <Label>Готово до оплати</Label>
-                                <select v-model="filterForm.ready_for_payment" class="h-8 rounded-md border border-input bg-transparent px-3 text-xs">
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Тип витрат</Label>
+                                <select v-model="filterForm.expense_type_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
+                                    <option value="">Усі</option>
+                                    <option v-for="type in props.expenseTypes" :key="type.id" :value="String(type.id)">{{ type.name }}</option>
+                                </select>
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Категорія</Label>
+                                <select v-model="filterForm.expense_category_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
+                                    <option value="">Усі</option>
+                                    <option v-for="category in props.expenseCategories" :key="category.id" :value="String(category.id)">{{ category.name }}</option>
+                                </select>
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Рахунок</Label>
+                                <select v-model="filterForm.paid_account_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
+                                    <option value="">Усі</option>
+                                    <option v-for="account in props.paymentAccounts" :key="account.id" :value="String(account.id)">{{ account.name }}</option>
+                                </select>
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">№ Закупки</Label>
+                                <Input v-model="filterForm.purchase_reference" type="text" class="h-8 w-full min-w-0 px-2.5 text-[12px]" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Готово</Label>
+                                <select v-model="filterForm.ready_for_payment" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
                                     <option value="">Усі</option>
                                     <option value="1">Так</option>
                                     <option value="0">Ні</option>
                                 </select>
                             </div>
-                            <div class="grid gap-2">
-                                <Label>Оплачено</Label>
-                                <select v-model="filterForm.paid" class="h-8 rounded-md border border-input bg-transparent px-3 text-xs">
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Оплачено</Label>
+                                <select v-model="filterForm.paid" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
                                     <option value="">Усі</option>
                                     <option value="1">Так</option>
                                     <option value="0">Ні</option>
                                 </select>
                             </div>
-                            <div class="grid gap-2">
-                                <Label>Дата створення (від)</Label>
-                                <Input v-model="filterForm.created_from" type="date" class="h-8 text-xs" />
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Дата від</Label>
+                                <Input v-model="filterForm.created_from" type="date" class="h-8 w-full min-w-0 px-2.5 text-[12px]" />
                             </div>
-                            <div class="grid gap-2">
-                                <Label>Дата створення (до)</Label>
-                                <Input v-model="filterForm.created_to" type="date" class="h-8 text-xs" />
+                            <div class="grid gap-1.5">
+                                <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Дата до</Label>
+                                <Input v-model="filterForm.created_to" type="date" class="h-8 w-full min-w-0 px-2.5 text-[12px]" />
                             </div>
                         </div>
 
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <Button variant="secondary" size="sm" @click="applyFilters">Застосувати</Button>
-                            <Button variant="ghost" size="sm" @click="clearFilters">Очистити</Button>
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
-
-                <Collapsible v-model:open="columnsOpen" class="mt-4">
-                    <CollapsibleContent>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                v-for="col in columnItems"
-                                :key="col.key"
-                                type="button"
-                                class="rounded-md border px-2.5 py-1 text-xs transition-colors"
-                                :class="columnVisibility[col.key] ? 'border-primary text-primary' : 'border-input text-muted-foreground'"
-                                @click="columnVisibility[col.key] = !columnVisibility[col.key]"
-                            >
-                                {{ columnVisibility[col.key] ? '✓' : '○' }} {{ col.label }}
-                            </button>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <Button variant="secondary" size="sm" class="h-8 px-3 text-xs" @click="applyFilters">Застосувати</Button>
+                            <Button variant="ghost" size="sm" class="h-8 px-3 text-xs" @click="clearFilters">Очистити</Button>
                         </div>
                     </CollapsibleContent>
                 </Collapsible>
@@ -946,4 +974,3 @@ const copyValue = async (value: unknown, label: string) => {
         </Drawer>
     </AppLayout>
 </template>
-

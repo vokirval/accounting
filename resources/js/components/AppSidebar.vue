@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, CreditCard, FileText, Folder, Shapes, Users } from 'lucide-vue-next';
+import { CreditCard, FileText, Shapes, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -58,9 +58,7 @@ const mainNavItems = computed<NavItem[]>(() => {
     return items;
 });
 
-const footerNavItems: NavItem[] = [
-    
-];
+const footerNavItems: NavItem[] = [];
 </script>
 
 <template>
@@ -88,5 +86,3 @@ const footerNavItems: NavItem[] = [
     </Sidebar>
     <slot />
 </template>
-
-

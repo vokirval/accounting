@@ -54,6 +54,25 @@ class PaymentRequestController extends Controller
             });
         }
 
+        $expenseTypeId = $request->input('expense_type_id');
+        if ($expenseTypeId !== null && $expenseTypeId !== '') {
+            $query->where('expense_type_id', (int) $expenseTypeId);
+        }
+
+        $expenseCategoryId = $request->input('expense_category_id');
+        if ($expenseCategoryId !== null && $expenseCategoryId !== '') {
+            $query->where('expense_category_id', (int) $expenseCategoryId);
+        }
+
+        $paidAccountId = $request->input('paid_account_id');
+        if ($paidAccountId !== null && $paidAccountId !== '') {
+            $query->where('paid_account_id', (int) $paidAccountId);
+        }
+
+        if ($request->filled('purchase_reference')) {
+            $query->where('purchase_reference', 'like', '%'.$request->string('purchase_reference').'%');
+        }
+
         $readyForPayment = $request->input('ready_for_payment');
         if ($readyForPayment !== null && $readyForPayment !== '') {
             $query->where('ready_for_payment', (string) $readyForPayment === '1');
@@ -72,10 +91,46 @@ class PaymentRequestController extends Controller
             $query->whereDate('created_at', '<=', $request->date('created_to'));
         }
 
+        $usersQuery = User::query()->orderBy('name')->select(['id', 'name', 'email', 'role']);
+
+        if ($user->isUser()) {
+            $usersQuery->whereKey($user->id);
+        }
+
+        $expenseTypes = ExpenseType::query()->orderBy('name')->get(['id', 'name']);
+        $expenseCategories = ExpenseCategory::query()->orderBy('name')->get(['id', 'name']);
+        $paymentAccounts = PaymentAccount::query()->orderBy('name')->get(['id', 'name']);
+
+        $expenseTypeNames = $expenseTypes->pluck('name', 'id')->all();
+        $expenseCategoryNames = $expenseCategories->pluck('name', 'id')->all();
+        $paymentAccountNames = $paymentAccounts->pluck('name', 'id')->all();
+
+        $mapHistoryValue = function (string $field, mixed $value) use (
+            $expenseTypeNames,
+            $expenseCategoryNames,
+            $paymentAccountNames,
+        ): mixed {
+            if ($value === null || $value === '') {
+                return $value;
+            }
+
+            $id = (int) $value;
+
+            return match ($field) {
+                'expense_type_id' => $expenseTypeNames[$id] ?? $value,
+                'expense_category_id' => $expenseCategoryNames[$id] ?? $value,
+                'paid_account_id' => $paymentAccountNames[$id] ?? $value,
+                default => $value,
+            };
+        };
+
         $paymentRequests = $query
-            ->paginate(10)
+            ->paginate(30)
             ->withQueryString()
-            ->through(function (PaymentRequest $paymentRequest) use ($user) {
+            ->through(function (PaymentRequest $paymentRequest) use (
+                $user,
+                $mapHistoryValue,
+            ) {
                 return [
                     'id' => $paymentRequest->id,
                     'author' => $paymentRequest->author,
@@ -95,13 +150,28 @@ class PaymentRequestController extends Controller
                     'history' => $paymentRequest->history
                         ->sortByDesc('created_at')
                         ->values()
-                        ->map(fn ($history) => [
-                            'id' => $history->id,
-                            'user' => $history->user,
-                            'action' => $history->action,
-                            'changed_fields' => $history->changed_fields,
-                            'created_at' => $history->created_at,
-                        ]),
+                        ->map(function ($history) use ($mapHistoryValue) {
+                            $changed = $history->changed_fields ?? [];
+
+                            foreach ($changed as $field => $value) {
+                                if (is_array($value) && array_key_exists('old', $value) && array_key_exists('new', $value)) {
+                                    $value['old'] = $mapHistoryValue($field, $value['old']);
+                                    $value['new'] = $mapHistoryValue($field, $value['new']);
+                                    $changed[$field] = $value;
+                                    continue;
+                                }
+
+                                $changed[$field] = $mapHistoryValue($field, $value);
+                            }
+
+                            return [
+                                'id' => $history->id,
+                                'user' => $history->user,
+                                'action' => $history->action,
+                                'changed_fields' => $changed,
+                                'created_at' => $history->created_at,
+                            ];
+                        }),
                     'can' => [
                         'update' => Gate::forUser($user)->allows('update', $paymentRequest),
                         'view' => Gate::forUser($user)->allows('view', $paymentRequest),
@@ -109,25 +179,23 @@ class PaymentRequestController extends Controller
                 ];
             });
 
-        $usersQuery = User::query()->orderBy('name')->select(['id', 'name', 'email', 'role']);
-
-        if ($user->isUser()) {
-            $usersQuery->whereKey($user->id);
-        }
-
         return Inertia::render('payment-requests/Index', [
             'paymentRequests' => $paymentRequests,
             'filters' => [
                 'author_id' => $request->input('author_id'),
                 'participant_id' => $request->input('participant_id'),
+                'expense_type_id' => $request->input('expense_type_id'),
+                'expense_category_id' => $request->input('expense_category_id'),
+                'paid_account_id' => $request->input('paid_account_id'),
+                'purchase_reference' => $request->input('purchase_reference'),
                 'ready_for_payment' => $request->input('ready_for_payment'),
                 'paid' => $request->input('paid'),
                 'created_from' => $request->input('created_from'),
                 'created_to' => $request->input('created_to'),
             ],
-            'expenseTypes' => ExpenseType::query()->orderBy('name')->get(['id', 'name']),
-            'expenseCategories' => ExpenseCategory::query()->orderBy('name')->get(['id', 'name']),
-            'paymentAccounts' => PaymentAccount::query()->orderBy('name')->get(['id', 'name']),
+            'expenseTypes' => $expenseTypes,
+            'expenseCategories' => $expenseCategories,
+            'paymentAccounts' => $paymentAccounts,
             'users' => $usersQuery->get(),
             'permissions' => [
                 'create' => Gate::forUser($user)->allows('create', PaymentRequest::class),
