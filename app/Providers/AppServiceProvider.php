@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Schema;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Schema::defaultStringLength(191);
         Gate::policy(PaymentRequest::class, PaymentRequestPolicy::class);
         Gate::policy(ExpenseType::class, AdminOnlyPolicy::class);
         Gate::policy(ExpenseCategory::class, AdminOnlyPolicy::class);
