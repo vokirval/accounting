@@ -341,6 +341,11 @@ const formatHistoryValue = (value: unknown) => {
     return String(value);
 };
 
+const isUrlValue = (value: unknown) => {
+    if (typeof value !== 'string') return false;
+    return value.startsWith('http://') || value.startsWith('https://');
+};
+
 const actionLabel = (action: string) => {
     if (action === 'created') return 'Створив заявку';
     if (action === 'updated') return 'Оновив заявку';
@@ -1183,17 +1188,46 @@ const copyValue = async (value: unknown, label: string) => {
                                         </div>
                                         <div v-if="typeof change === 'object' && change !== null && 'old' in change && 'new' in change" class="space-y-1 text-xs">
                                             <span class="text-muted-foreground">Було:</span>
-                                            <div class="break-all rounded-sm bg-muted/40 px-2 py-1">
-                                                {{ formatHistoryValue((change as { old: unknown }).old) }}
+                                            <div class="flex items-start gap-2 break-all rounded-sm bg-muted/40 px-2 py-1">
+                                                <span>{{ formatHistoryValue((change as { old: unknown }).old) }}</span>
+                                                <button
+                                                    v-if="isUrlValue((change as { old: unknown }).old)"
+                                                    type="button"
+                                                    class="ml-auto"
+                                                    @click="copyValue((change as { old: unknown }).old, 'URL')"
+                                                    aria-label="Скопіювати URL"
+                                                >
+                                                    <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                </button>
                                             </div>
                                             <span class="mx-2 text-muted-foreground">→</span>
                                             <span class="text-muted-foreground">Стало:</span>
-                                            <div class="break-all rounded-sm bg-muted/40 px-2 py-1">
-                                                {{ formatHistoryValue((change as { new: unknown }).new) }}
+                                            <div class="flex items-start gap-2 break-all rounded-sm bg-muted/40 px-2 py-1">
+                                                <span>{{ formatHistoryValue((change as { new: unknown }).new) }}</span>
+                                                <button
+                                                    v-if="isUrlValue((change as { new: unknown }).new)"
+                                                    type="button"
+                                                    class="ml-auto"
+                                                    @click="copyValue((change as { new: unknown }).new, 'URL')"
+                                                    aria-label="Скопіювати URL"
+                                                >
+                                                    <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                </button>
                                             </div>
                                         </div>
                                         <div v-else class="break-all rounded-sm bg-muted/40 px-2 py-1 text-xs">
-                                            {{ formatHistoryValue(change) }}
+                                            <div class="flex items-start gap-2">
+                                                <span>{{ formatHistoryValue(change) }}</span>
+                                                <button
+                                                    v-if="isUrlValue(change)"
+                                                    type="button"
+                                                    class="ml-auto"
+                                                    @click="copyValue(change, 'URL')"
+                                                    aria-label="Скопіювати URL"
+                                                >
+                                                    <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
