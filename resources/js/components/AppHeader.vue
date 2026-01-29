@@ -63,21 +63,16 @@ const mainNavItems = computed<NavItem[]>(() => {
     ];
 
     if (auth.value?.user?.role === 'admin') {
-        items.push(
-            {
-                title: 'Типи витрат',
-                href: '/admin/expense-types',
-                icon: Shapes,
-            },
-            {
-                title: 'Категорії витрат',
-                href: '/admin/expense-categories',
-                icon: Shapes,
-            },
-            {
-                title: 'Рахунки для оплати',
-                href: '/admin/payment-accounts',
-                icon: CreditCard,
+            items.push(
+                {
+                    title: 'Типи витрат',
+                    href: '/admin/expense-types',
+                    icon: Shapes,
+                },
+                {
+                    title: 'Рахунки для оплати',
+                    href: '/admin/payment-accounts',
+                    icon: CreditCard,
             },
             {
                 title: 'Користувачі',
@@ -310,4 +305,3 @@ const rightNavItems: NavItem[] = [
         </div>
     </div>
 </template>
-

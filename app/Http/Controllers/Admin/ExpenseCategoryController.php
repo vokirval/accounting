@@ -43,6 +43,16 @@ class ExpenseCategoryController extends Controller
     {
         $this->authorize('delete', $expenseCategory);
 
+        $requestCount = $expenseCategory->paymentRequests()->count();
+        if ($requestCount > 0) {
+            return back()->withErrors([
+                'delete' => sprintf(
+                    'РќРµРјРѕР¶Р»РёРІРѕ РІРёРґР°Р»РёС‚Рё РєР°С‚РµРіРѕСЂС–СЋ РІРёС‚СЂР°С‚. РџРѕРІвЂ™СЏР·Р°РЅС– Р·Р°СЏРІРєРё: %d. РЎРїРѕС‡Р°С‚РєСѓ РІРёРґР°Р»С–С‚СЊ Р°Р±Рѕ Р·РјС–РЅС–С‚СЊ С†С– Р·Р°СЏРІРєРё.',
+                    $requestCount,
+                ),
+            ]);
+        }
+
         $expenseCategory->delete();
 
         return back();

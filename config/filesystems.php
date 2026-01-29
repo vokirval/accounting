@@ -14,6 +14,7 @@ return [
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
+    'payment_disk' => env('PAYMENT_FILES_DISK', 'public'),
 
     /*
     |--------------------------------------------------------------------------

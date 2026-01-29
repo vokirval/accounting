@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,7 +38,7 @@ class PaymentRequestController extends Controller
             ->orderByDesc('created_at');
 
         if ($user->isUser()) {
-            $query->whereHas('participants', function ($participants) use ($user) {
+            $query->whereHas('author', function ($participants) use ($user) {
                 $participants->where('users.id', $user->id);
             });
         }
@@ -98,7 +99,7 @@ class PaymentRequestController extends Controller
         }
 
         $expenseTypes = ExpenseType::query()->orderBy('name')->get(['id', 'name']);
-        $expenseCategories = ExpenseCategory::query()->orderBy('name')->get(['id', 'name']);
+        $expenseCategories = ExpenseCategory::query()->orderBy('name')->get(['id', 'name', 'expense_type_id']);
         $paymentAccounts = PaymentAccount::query()->orderBy('name')->get(['id', 'name']);
 
         $expenseTypeNames = $expenseTypes->pluck('name', 'id')->all();
@@ -124,8 +125,25 @@ class PaymentRequestController extends Controller
             };
         };
 
+        $showTotals = $request->filled('created_from');
+        $totals = null;
+
+        if ($showTotals) {
+            $totalsQuery = clone $query;
+            $totals = [
+                'amount' => (float) $totalsQuery->sum('amount'),
+                'commission' => (float) $totalsQuery->sum('commission'),
+            ];
+        }
+
+        $perPage = (int) $request->input('per_page', 30);
+        $allowedPerPage = [10, 20, 30, 50, 100];
+        if (! in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 30;
+        }
+
         $paymentRequests = $query
-            ->paginate(30)
+            ->paginate($perPage)
             ->withQueryString()
             ->through(function (PaymentRequest $paymentRequest) use (
                 $user,
@@ -139,7 +157,9 @@ class PaymentRequestController extends Controller
                     'paid_account' => $paymentRequest->paidAccount,
                     'participants' => $paymentRequest->participants,
                     'requisites' => $paymentRequest->requisites,
+                    'requisites_file_url' => $paymentRequest->requisites_file_url,
                     'amount' => $paymentRequest->amount,
+                    'commission' => $paymentRequest->commission,
                     'purchase_reference' => $paymentRequest->purchase_reference,
                     'ready_for_payment' => $paymentRequest->ready_for_payment,
                     'paid' => $paymentRequest->paid,
@@ -192,11 +212,13 @@ class PaymentRequestController extends Controller
                 'paid' => $request->input('paid'),
                 'created_from' => $request->input('created_from'),
                 'created_to' => $request->input('created_to'),
+                'per_page' => $perPage,
             ],
             'expenseTypes' => $expenseTypes,
             'expenseCategories' => $expenseCategories,
             'paymentAccounts' => $paymentAccounts,
             'users' => $usersQuery->get(),
+            'totals' => $totals,
             'permissions' => [
                 'create' => Gate::forUser($user)->allows('create', PaymentRequest::class),
             ],
@@ -222,11 +244,25 @@ class PaymentRequestController extends Controller
             $data['receipt_url'] = null;
         }
 
+        if (array_key_exists('commission', $data) && $data['commission'] === '') {
+            $data['commission'] = null;
+        }
+
         if ($request->hasFile('receipt_file')) {
             $data['receipt_url'] = $this->storeReceiptFile($request->file('receipt_file'));
         }
 
+        if ($request->hasFile('requisites_file')) {
+            $data['requisites_file_url'] = $this->storeRequisitesFile($request->file('requisites_file'));
+            $data['requisites_file_uploaded_at'] = now();
+        }
+
         unset($data['receipt_file']);
+        unset($data['requisites_file']);
+
+        if ($user->isUser()) {
+            $data['commission'] = null;
+        }
 
         $paymentRequest = PaymentRequest::create([
             ...$data,
@@ -244,7 +280,9 @@ class PaymentRequestController extends Controller
                 'expense_type_id',
                 'expense_category_id',
                 'requisites',
+                'requisites_file_url',
                 'amount',
+                'commission',
                 'purchase_reference',
                 'ready_for_payment',
                 'paid',
@@ -282,11 +320,26 @@ class PaymentRequestController extends Controller
             unset($data['receipt_url']);
         }
 
+        if (array_key_exists('commission', $data) && $data['commission'] === '') {
+            $data['commission'] = null;
+        }
+
+        if ($user->isUser()) {
+            $data['commission'] = $paymentRequest->commission;
+        }
+
         if ($request->hasFile('receipt_file')) {
             $data['receipt_url'] = $this->storeReceiptFile($request->file('receipt_file'));
         }
 
+        if ($request->hasFile('requisites_file')) {
+            $this->deleteFileByUrl($paymentRequest->requisites_file_url);
+            $data['requisites_file_url'] = $this->storeRequisitesFile($request->file('requisites_file'));
+            $data['requisites_file_uploaded_at'] = now();
+        }
+
         unset($data['receipt_file']);
+        unset($data['requisites_file']);
 
         $paymentRequest->fill($data);
         $paymentRequest->save();
@@ -311,7 +364,7 @@ class PaymentRequestController extends Controller
 
     private function buildChangeSet(array $original, array $changes): array
     {
-        $filtered = Arr::except($changes, ['updated_at']);
+        $filtered = Arr::except($changes, ['updated_at', 'requisites_file_uploaded_at']);
 
         $result = [];
         foreach ($filtered as $field => $value) {
@@ -339,8 +392,44 @@ class PaymentRequestController extends Controller
 
     private function storeReceiptFile(\Illuminate\Http\UploadedFile $file): string
     {
-        $path = $file->store('receipts', 'public');
+        $disk = $this->paymentFilesDisk();
+        $path = $file->store('receipts', $disk);
 
-        return Storage::disk('public')->url($path);
+        return Storage::disk($disk)->url($path);
+    }
+
+    private function storeRequisitesFile(\Illuminate\Http\UploadedFile $file): string
+    {
+        $disk = $this->paymentFilesDisk();
+        $path = $file->store('requisites', $disk);
+
+        return Storage::disk($disk)->url($path);
+    }
+
+    private function paymentFilesDisk(): string
+    {
+        return (string) config('payment_requests.files_disk', config('filesystems.payment_disk', 'public'));
+    }
+
+    private function deleteFileByUrl(?string $url): void
+    {
+        if (! $url) {
+            return;
+        }
+
+        $disk = $this->paymentFilesDisk();
+        $baseUrl = rtrim((string) Storage::disk($disk)->url(''), '/');
+        $cleanUrl = strtok($url, '?') ?: $url;
+
+        if ($baseUrl === '' || ! Str::startsWith($cleanUrl, $baseUrl)) {
+            return;
+        }
+
+        $path = ltrim(Str::after($cleanUrl, $baseUrl), '/');
+        if ($path === '') {
+            return;
+        }
+
+        Storage::disk($disk)->delete($path);
     }
 }

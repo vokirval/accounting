@@ -43,6 +43,16 @@ class PaymentAccountController extends Controller
     {
         $this->authorize('delete', $paymentAccount);
 
+        $requestCount = $paymentAccount->paymentRequests()->count();
+        if ($requestCount > 0) {
+            return back()->withErrors([
+                'delete' => sprintf(
+                    'Неможливо видалити рахунок. Пов’язані заявки: %d. Спочатку видаліть або змініть ці заявки.',
+                    $requestCount,
+                ),
+            ]);
+        }
+
         $paymentAccount->delete();
 
         return back();

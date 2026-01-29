@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\ExpenseCategoryController;
 use App\Http\Controllers\Admin\ExpenseTypeController;
 use App\Http\Controllers\Admin\PaymentAccountController;
 use App\Http\Controllers\Admin\UserController;
@@ -21,11 +20,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('expense-types', [ExpenseTypeController::class, 'store'])->name('admin.expense-types.store');
         Route::put('expense-types/{expenseType}', [ExpenseTypeController::class, 'update'])->name('admin.expense-types.update');
         Route::delete('expense-types/{expenseType}', [ExpenseTypeController::class, 'destroy'])->name('admin.expense-types.destroy');
-
-        Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->name('admin.expense-categories.index');
-        Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->name('admin.expense-categories.store');
-        Route::put('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update'])->name('admin.expense-categories.update');
-        Route::delete('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy'])->name('admin.expense-categories.destroy');
+        Route::post('expense-types/{expenseType}/categories', [ExpenseTypeController::class, 'storeCategory'])->name('admin.expense-types.categories.store');
+        Route::put('expense-types/{expenseType}/categories/{expenseCategory}', [ExpenseTypeController::class, 'updateCategory'])->name('admin.expense-types.categories.update');
+        Route::delete('expense-types/{expenseType}/categories/{expenseCategory}', [ExpenseTypeController::class, 'destroyCategory'])->name('admin.expense-types.categories.destroy');
 
         Route::get('payment-accounts', [PaymentAccountController::class, 'index'])->name('admin.payment-accounts.index');
         Route::post('payment-accounts', [PaymentAccountController::class, 'store'])->name('admin.payment-accounts.store');

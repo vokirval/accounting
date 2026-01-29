@@ -35,10 +35,12 @@ import {
     Clipboard,
     Filter,
     History,
+    Paperclip,
     Pencil,
 } from 'lucide-vue-next';
 
 type NamedItem = { id: number; name: string };
+type CategoryItem = { id: number; name: string; expense_type_id: number | null };
 
 
 
@@ -59,7 +61,9 @@ type PaymentRequestRow = {
     paid_account: NamedItem | null;
     participants: { id: number; name: string }[];
     requisites: string;
+    requisites_file_url: string | null;
     amount: string;
+    commission: string | null;
     purchase_reference: string | null;
     ready_for_payment: boolean;
     paid: boolean;
@@ -92,11 +96,16 @@ type PageProps = AppPageProps<{
         paid: string | null;
         created_from: string | null;
         created_to: string | null;
+        per_page?: number | string | null;
     };
     expenseTypes: NamedItem[];
-    expenseCategories: NamedItem[];
+    expenseCategories: CategoryItem[];
     paymentAccounts: NamedItem[];
     users: { id: number; name: string; email: string; role: string }[];
+    totals?: {
+        amount: number;
+        commission: number;
+    } | null;
     permissions: {
         create: boolean;
     };
@@ -105,11 +114,18 @@ type PageProps = AppPageProps<{
 const page = usePage<PageProps>();
 const props = computed(() => page.props);
 
+const formatMoney = (value: number) =>
+    new Intl.NumberFormat('uk-UA', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
 
 const role = computed(() => props.value.auth.user.role);
 const isUser = computed(() => role.value === 'user');
 const canMarkPaid = computed(() => role.value !== 'user');
 const canManageReceipt = computed(() => role.value !== 'user');
+const canManageCommission = computed(() => role.value !== 'user');
+const canManagePaidAccount = computed(() => role.value !== 'user');
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Платіжні заявки', href: '/payment-requests' },
@@ -126,6 +142,63 @@ const filterForm = reactive({
     paid: props.value.filters.paid ?? '',
     created_from: props.value.filters.created_from ?? '',
     created_to: props.value.filters.created_to ?? '',
+    per_page: props.value.filters.per_page ?? 30,
+});
+
+const appliedFilters = computed(() => {
+    const items: { label: string; value: string }[] = [];
+    const userName = (id: string) => {
+        const found = props.value.users.find((user) => user.id === Number(id));
+        return found?.name ?? `#${id}`;
+    };
+    const expenseTypeName = (id: string) => {
+        const found = props.value.expenseTypes.find((type) => type.id === Number(id));
+        return found?.name ?? `#${id}`;
+    };
+    const expenseCategoryName = (id: string) => {
+        const found = props.value.expenseCategories.find((category) => category.id === Number(id));
+        return found?.name ?? `#${id}`;
+    };
+    const accountName = (id: string) => {
+        const found = props.value.paymentAccounts.find((account) => account.id === Number(id));
+        return found?.name ?? `#${id}`;
+    };
+
+    if (filterForm.author_id) {
+        items.push({ label: 'Автор', value: userName(filterForm.author_id) });
+    }
+    if (filterForm.participant_id) {
+        items.push({ label: 'Учасник', value: userName(filterForm.participant_id) });
+    }
+    if (filterForm.expense_type_id) {
+        items.push({ label: 'Тип витрат', value: expenseTypeName(filterForm.expense_type_id) });
+    }
+    if (filterForm.expense_category_id) {
+        items.push({ label: 'Категорія', value: expenseCategoryName(filterForm.expense_category_id) });
+    }
+    if (filterForm.paid_account_id) {
+        items.push({ label: 'Рахунок', value: accountName(filterForm.paid_account_id) });
+    }
+    if (filterForm.purchase_reference) {
+        items.push({ label: '№ закупки', value: filterForm.purchase_reference });
+    }
+    if (filterForm.ready_for_payment !== '') {
+        items.push({
+            label: 'Готово до оплати',
+            value: filterForm.ready_for_payment === '1' ? 'Так' : 'Ні',
+        });
+    }
+    if (filterForm.paid !== '') {
+        items.push({ label: 'Оплачено', value: filterForm.paid === '1' ? 'Так' : 'Ні' });
+    }
+    if (filterForm.created_from) {
+        items.push({ label: 'Від', value: filterForm.created_from });
+    }
+    if (filterForm.created_to) {
+        items.push({ label: 'До', value: filterForm.created_to });
+    }
+
+    return items;
 });
 
 const drawerOpen = ref(false);
@@ -158,7 +231,7 @@ const columnItems: { key: keyof typeof columnVisibility; label: string }[] = [
     { key: 'expense_type', label: 'Тип витрат' },
     { key: 'expense_category', label: 'Категорія витрат' },
     { key: 'requisites', label: 'Реквізити' },
-    { key: 'amount', label: 'Сума' },
+    { key: 'amount', label: 'Сума/Комісія' },
     { key: 'purchase_reference', label: '№ Закупки' },
     { key: 'paid_account', label: 'Рахунок' },
     { key: 'status', label: 'Статус' },
@@ -166,6 +239,115 @@ const columnItems: { key: keyof typeof columnVisibility; label: string }[] = [
     { key: 'participants', label: 'Учасники' },
     
 ];
+
+const visibleColumnsCount = computed(
+    () => Object.values(columnVisibility).filter(Boolean).length + 1,
+);
+
+
+const form = useForm({
+    expense_type_id: '' as number | '',
+    expense_category_id: '' as number | '',
+    requisites: '',
+    requisites_file: null as File | null,
+    amount: '',
+    commission: '' as string | '',
+    purchase_reference: '',
+    paid_account_id: '' as number | '',
+    ready_for_payment: false,
+    paid: false,
+    receipt_url: '',
+    receipt_file: null as File | null,
+});
+
+type FormPayload = typeof form extends { data: () => infer D } ? D : never;
+
+const resetFormState = () => {
+    form.reset();
+    form.clearErrors();
+    form.ready_for_payment = false;
+    form.paid = false;
+    form.receipt_url = '';
+    form.receipt_file = null;
+    form.requisites_file = null;
+    receiptMode.value = 'url';
+    isEditing.value = false;
+    selected.value = null;
+};
+
+const statusLabel = (item: PaymentRequestRow) => {
+    if (item.paid) return 'Оплачено';
+    if (item.ready_for_payment) return 'Готово до оплати';
+    return 'Чернетка';
+};
+
+const statusVariant = (item: PaymentRequestRow) => {
+    if (item.paid) return 'default';
+    if (item.ready_for_payment) return 'secondary';
+    return 'outline';
+};
+
+const historyFieldLabels: Record<string, string> = {
+    expense_type_id: 'Тип витрат',
+    expense_category_id: 'Категорія витрат',
+    requisites: 'Реквізити для оплати',
+    requisites_file_url: 'Файл реквізитів',
+    amount: 'Сума',
+    commission: 'Комісія',
+    purchase_reference: 'Номер з таблиці по закупці',
+    ready_for_payment: 'Готово до оплати',
+    paid: 'Оплачено',
+    paid_account_id: 'Рахунок оплати',
+    receipt_url: 'Квитанція (посилання)',
+};
+
+
+const filteredCategories = computed(() => {
+    if (!form.expense_type_id) {
+        return props.value.expenseCategories;
+    }
+    return props.value.expenseCategories.filter(
+        (category) => category.expense_type_id === Number(form.expense_type_id),
+    );
+});
+
+const filteredFilterCategories = computed(() => {
+    if (!filterForm.expense_type_id) {
+        return props.value.expenseCategories;
+    }
+    return props.value.expenseCategories.filter(
+        (category) => category.expense_type_id === Number(filterForm.expense_type_id),
+    );
+});
+
+const selectedExpenseType = computed(() => {
+    if (!form.expense_type_id) {
+        return null;
+    }
+    return props.value.expenseTypes.find(
+        (type) => type.id === Number(form.expense_type_id),
+    );
+});
+
+const showPurchaseReference = computed(() => selectedExpenseType.value?.name === 'Оплата за товар');
+
+const formatHistoryValue = (value: unknown) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'Так' : 'Ні';
+    }
+    return String(value);
+};
+
+const actionLabel = (action: string) => {
+    if (action === 'created') return 'Створив заявку';
+    if (action === 'updated') return 'Оновив заявку';
+    if (action === 'status_changed') return 'Змінив статус';
+    if (action === 'requisites_file_pruned') return 'Автоматично видалено файл реквізитів';
+    return action;
+};
 
 onMounted(() => {
     try {
@@ -194,73 +376,23 @@ watch(
     { deep: true },
 );
 
-const form = useForm({
-    expense_type_id: '' as number | '',
-    expense_category_id: '' as number | '',
-    requisites: '',
-    amount: '',
-    purchase_reference: '',
-    paid_account_id: '' as number | '',
-    ready_for_payment: false,
-    paid: false,
-    receipt_url: '',
-    receipt_file: null as File | null,
-});
+watch(
+    () => form.expense_type_id,
+    () => {
+        if (!filteredCategories.value.some((category) => category.id === Number(form.expense_category_id))) {
+            form.expense_category_id = '';
+        }
+    },
+);
 
-type FormPayload = typeof form extends { data: () => infer D } ? D : never;
-
-const resetFormState = () => {
-    form.reset();
-    form.clearErrors();
-    form.ready_for_payment = false;
-    form.paid = false;
-    form.receipt_url = '';
-    form.receipt_file = null;
-    receiptMode.value = 'url';
-    isEditing.value = false;
-    selected.value = null;
-};
-
-const statusLabel = (item: PaymentRequestRow) => {
-    if (item.paid) return 'Оплачено';
-    if (item.ready_for_payment) return 'Готово до оплати';
-    return 'Чернетка';
-};
-
-const statusVariant = (item: PaymentRequestRow) => {
-    if (item.paid) return 'default';
-    if (item.ready_for_payment) return 'secondary';
-    return 'outline';
-};
-
-const historyFieldLabels: Record<string, string> = {
-    expense_type_id: 'Тип витрат',
-    expense_category_id: 'Категорія витрат',
-    requisites: 'Реквізити для оплати',
-    amount: 'Сума',
-    purchase_reference: 'Номер з таблиці по закупці',
-    ready_for_payment: 'Готово до оплати',
-    paid: 'Оплачено',
-    paid_account_id: 'Рахунок оплати',
-    receipt_url: 'Квитанція (посилання)',
-};
-
-const formatHistoryValue = (value: unknown) => {
-    if (value === null || value === undefined || value === '') {
-        return '—';
-    }
-    if (typeof value === 'boolean') {
-        return value ? 'Так' : 'Ні';
-    }
-    return String(value);
-};
-
-const actionLabel = (action: string) => {
-    if (action === 'created') return 'Створив заявку';
-    if (action === 'updated') return 'Оновив заявку';
-    if (action === 'status_changed') return 'Змінив статус';
-    return action;
-};
+watch(
+    () => filterForm.expense_type_id,
+    () => {
+        if (!filteredFilterCategories.value.some((category) => category.id === Number(filterForm.expense_category_id))) {
+            filterForm.expense_category_id = '';
+        }
+    },
+);
 
 const setReceiptMode = (mode: 'url' | 'file') => {
     receiptMode.value = mode;
@@ -289,12 +421,14 @@ const openEdit = (item: PaymentRequestRow) => {
     form.expense_category_id = item.expense_category?.id ?? '';
     form.requisites = item.requisites ?? '';
     form.amount = item.amount ?? '';
+    form.commission = item.commission ?? '';
     form.purchase_reference = item.purchase_reference ?? '';
     form.paid_account_id = item.paid_account_id ?? '';
     form.ready_for_payment = toBool(item.ready_for_payment);
     form.paid = toBool(item.paid);
     form.receipt_url = item.receipt_url ?? '';
     form.receipt_file = null;
+    form.requisites_file = null;
     receiptMode.value = 'url';
     drawerOpen.value = true;
 
@@ -317,6 +451,7 @@ const submit = () => {
         form.paid = false;
         form.receipt_url = '';
         form.receipt_file = null;
+        form.commission = '';
     }
 
     // Only drop the URL when a new file is actually selected.
@@ -364,6 +499,12 @@ const applyFilters = () => {
     });
 };
 
+const changePerPage = (event: Event) => {
+    const target = event.target as HTMLSelectElement;
+    filterForm.per_page = target.value;
+    applyFilters();
+};
+
 const clearFilters = () => {
     filterForm.author_id = '';
     filterForm.participant_id = '';
@@ -375,12 +516,18 @@ const clearFilters = () => {
     filterForm.paid = '';
     filterForm.created_from = '';
     filterForm.created_to = '';
+    filterForm.per_page = 30;
     applyFilters();
 };
 
 const onReceiptFileChange = (event: Event) => {
     const target = event.target as HTMLInputElement;
     form.receipt_file = target.files?.[0] ?? null;
+};
+
+const onRequisitesFileChange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    form.requisites_file = target.files?.[0] ?? null;
 };
 
 const copyReceiptUrl = async (url: string) => {
@@ -484,7 +631,7 @@ const copyValue = async (value: unknown, label: string) => {
                                 <Label class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Категорія</Label>
                                 <select v-model="filterForm.expense_category_id" class="h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[12px]">
                                     <option value="">Усі</option>
-                                    <option v-for="category in props.expenseCategories" :key="category.id" :value="String(category.id)">{{ category.name }}</option>
+                                    <option v-for="category in filteredFilterCategories" :key="category.id" :value="String(category.id)">{{ category.name }}</option>
                                 </select>
                             </div>
                             <div class="grid gap-1.5">
@@ -543,7 +690,7 @@ const copyValue = async (value: unknown, label: string) => {
                                 <th v-if="columnVisibility.expense_type" class="px-3 py-2 whitespace-nowrap">Тип витрат</th>
                                 <th v-if="columnVisibility.expense_category" class="px-3 py-2 whitespace-nowrap">Категорія витрат</th>
                                 <th v-if="columnVisibility.requisites" class="px-3 py-2">Реквізити</th>
-                                <th v-if="columnVisibility.amount" class="px-3 py-2">Сума</th>
+                                <th v-if="columnVisibility.amount" class="px-3 py-2">Сума / Комісія</th>
                                 <th v-if="columnVisibility.purchase_reference" class="px-3 py-2 whitespace-nowrap">№ Закупки</th>
                                 <!--<th class="px-3 py-2 whitespace-nowrap">Готово до оплати</th>-->
                                 <th v-if="columnVisibility.paid_account" class="px-3 py-2">Рахунок</th>
@@ -609,14 +756,15 @@ const copyValue = async (value: unknown, label: string) => {
                                         <TooltipProvider :delay-duration="100">
                                             <Tooltip>
                                                 <TooltipTrigger as-child>
-                                                    <span class="truncate leading-5 max-w-32">{{ item.requisites }}</span>
+                                                    <span class="truncate leading-5 max-w-32">{{ item.requisites ?? '—' }}</span>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    <span class="text-xs">{{ item.requisites }}</span>
+                                                    <span class="text-xs">{{ item.requisites ?? '—' }}</span>
                                                 </TooltipContent>
                                             </Tooltip>
                                         </TooltipProvider>
                                         <button
+                                            v-if="item.requisites"
                                             type="button"
                                             class="mt-0.5"
                                             @click="copyValue(item.requisites, 'Реквізити')"
@@ -624,19 +772,43 @@ const copyValue = async (value: unknown, label: string) => {
                                         >
                                             <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                         </button>
+                                        <div v-if="item.requisites_file_url" class="mt-0.5">
+                                            <TooltipProvider :delay-duration="100">
+                                                <Tooltip>
+                                                    <TooltipTrigger as-child>
+                                                        <button
+                                                            type="button"
+                                                            class=""
+                                                            @click="copyValue(item.requisites_file_url, 'Файл реквізитів')"
+                                                            aria-label="Скопіювати файл реквізитів"
+                                                        >
+                                                            <Paperclip class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <span class="text-xs">{{ item.requisites_file_url }}</span>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
                                     </div>
                                 </td>
                                 <td v-if="columnVisibility.amount" class="px-3 py-2 font-medium">
-                                    <div class="group inline-flex items-center gap-1">
-                                        <span>{{ item.amount }}</span>
-                                        <button
-                                            type="button"
-                                            class=""
-                                            @click="copyValue(item.amount, 'Суму')"
-                                            aria-label="Скопіювати суму"
-                                        >
-                                            <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                        </button>
+                                    <div class="group flex flex-col">
+                                        <div class="inline-flex items-center gap-1">
+                                            <span>{{ item.amount }}</span>
+                                            <button
+                                                type="button"
+                                                class=""
+                                                @click="copyValue(item.amount, 'Суму')"
+                                                aria-label="Скопіювати суму"
+                                            >
+                                                <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                            </button>
+                                        </div>
+                                        <span v-if="item.commission" class="text-[11px] text-muted-foreground">
+                                            Комісія: {{ item.commission }}
+                                        </span>
                                     </div>
                                 </td>
                                 <td v-if="columnVisibility.purchase_reference" class="px-3 py-2">
@@ -765,13 +937,27 @@ const copyValue = async (value: unknown, label: string) => {
                                 </td>
                             </tr>
                             <tr v-if="props.paymentRequests.data.length === 0">
-                                <td class="px-4 py-6 text-center text-muted-foreground" colspan="16">Заявок не знайдено.</td>
+                                <td class="px-4 py-6 text-center text-muted-foreground" :colspan="visibleColumnsCount">Заявок не знайдено.</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 border-t border-sidebar-border/70 px-4 py-3">
+                <div class="flex flex-wrap items-center gap-3 border-t border-sidebar-border/70 px-4 py-3">
+                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>На сторінці:</span>
+                        <select
+                            :value="String(filterForm.per_page)"
+                            class="h-8 rounded-md border border-input bg-transparent px-2 text-xs text-foreground"
+                            @change="changePerPage"
+                        >
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="30">30</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
                     <template v-for="link in props.paymentRequests.links" :key="link.label">
                         <Link
                             v-if="link.url"
@@ -786,6 +972,37 @@ const copyValue = async (value: unknown, label: string) => {
                             v-html="link.label"
                         />
                     </template>
+                </div>
+
+                <div class="border-t border-sidebar-border/70 px-4 py-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+                        <span class="font-medium text-foreground">Активні фільтри:</span>
+                        <template v-if="appliedFilters.length">
+                            <span
+                                v-for="item in appliedFilters"
+                                :key="`${item.label}-${item.value}`"
+                                class="rounded-md border border-input/60 bg-background px-2 py-1 text-foreground"
+                            >
+                                {{ item.label }}: {{ item.value }}
+                            </span>
+                        </template>
+                        <span v-else>немає</span>
+                    </div>
+                </div>
+
+                <div
+                    v-if="props.totals"
+                    class="border-t border-sidebar-border/70 bg-muted/30 px-4 py-3"
+                >
+                    <div class="flex flex-col gap-2 text-sm">
+                        <span class="text-xs text-muted-foreground">
+                            Підсумок по всіх заявках, що відповідають фільтрам за заданий період:
+                        </span>
+                        <div class="flex flex-wrap items-center gap-4 font-semibold">
+                            <span>Сума: {{ formatMoney(props.totals.amount) }}</span>
+                            <span>Комісія: {{ formatMoney(props.totals.commission) }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -819,28 +1036,48 @@ const copyValue = async (value: unknown, label: string) => {
                                 </div>
                                 <div class="grid gap-2">
                                     <Label>Категорія витрат</Label>
-                                    <select v-model="form.expense_category_id" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                                    <select v-model="form.expense_category_id" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm" :disabled="!form.expense_type_id">
                                         <option value="">Оберіть категорію</option>
-                                        <option v-for="category in props.expenseCategories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                                        <option v-for="category in filteredCategories" :key="category.id" :value="category.id">{{ category.name }}</option>
                                     </select>
                                     <span v-if="form.errors.expense_category_id" class="text-sm text-red-600">{{ form.errors.expense_category_id }}</span>
                                 </div>
-                                <div class="grid gap-2 md:col-span-2">
+                                <div v-if="showPurchaseReference" class="grid gap-2">
+                                    <Label>Номер з таблиці по закупці</Label>
+                                    <Input v-model="form.purchase_reference" type="text" />
+                                    <span v-if="form.errors.purchase_reference" class="text-sm text-red-600">{{ form.errors.purchase_reference }}</span>
+                                </div>
+                                <div class="grid gap-2 md:col-span-1">
                                     <Label>Реквізити для оплати</Label>
                                     <Input v-model="form.requisites" type="text" />
                                     <span v-if="form.errors.requisites" class="text-sm text-red-600">{{ form.errors.requisites }}</span>
                                 </div>
+                                <div class="grid gap-2 md:col-span-1">
+                                    <Label>Файл реквізитів</Label>
+                                    <Input
+                                        type="file"
+                                        accept=".xls,.xlsx,.csv,.pdf,.jpg,.jpeg,.png,.webp"
+                                        @change="onRequisitesFileChange"
+                                    />
+                                    <span v-if="form.errors.requisites_file" class="text-sm text-red-600">{{ form.errors.requisites_file }}</span>
+                                    <p v-if="selected?.requisites_file_url" class="text-xs text-muted-foreground">
+                                        Поточний файл:
+                                        <a :href="selected.requisites_file_url" class="underline" target="_blank" rel="noreferrer">переглянути</a>
+                                    </p>
+                                </div>
+                                
                                 <div class="grid gap-2">
                                     <Label>Сума</Label>
                                     <Input v-model="form.amount" type="number" step="0.01" />
                                     <span v-if="form.errors.amount" class="text-sm text-red-600">{{ form.errors.amount }}</span>
                                 </div>
-                                <div class="grid gap-2">
-                                    <Label>Номер з таблиці по закупці</Label>
-                                    <Input v-model="form.purchase_reference" type="text" />
-                                    <span v-if="form.errors.purchase_reference" class="text-sm text-red-600">{{ form.errors.purchase_reference }}</span>
+                                <div v-if="canManageCommission" class="grid gap-2">
+                                    <Label>Комісія</Label>
+                                    <Input v-model="form.commission" type="number" step="0.01" />
+                                    <span v-if="form.errors.commission" class="text-sm text-red-600">{{ form.errors.commission }}</span>
                                 </div>
-                                <div class="grid gap-2 md:col-span-2">
+                                
+                                <div v-if="canManagePaidAccount"class="grid gap-2 md:col-span-2">
                                     <Label>Рахунок, з якого була здійснена оплата</Label>
                                     <select v-model="form.paid_account_id" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
                                         <option value="">Оберіть рахунок</option>

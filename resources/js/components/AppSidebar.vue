@@ -38,11 +38,6 @@ const mainNavItems = computed<NavItem[]>(() => {
                 icon: Shapes,
             },
             {
-                title: 'Категорії витрат',
-                href: '/admin/expense-categories',
-                icon: Shapes,
-            },
-            {
                 title: 'Рахунки для оплати',
                 href: '/admin/payment-accounts',
                 icon: CreditCard,

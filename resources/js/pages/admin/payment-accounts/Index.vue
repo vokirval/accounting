@@ -16,6 +16,7 @@ type PageProps = AppPageProps<{
 
 const page = usePage<PageProps>();
 const props = computed(() => page.props);
+const errors = computed(() => (props.value.errors ?? {}) as Record<string, string>);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Адмін', href: '/admin/users' },
@@ -91,7 +92,12 @@ const remove = (item: Item) => {
                 </div>
                 <Button @click="openCreate">Створити рахунок</Button>
             </div>
-
+            <div
+                v-if="errors.delete"
+                class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+            >
+                <p>{{ errors.delete }}</p>
+            </div>
             <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-white dark:border-sidebar-border dark:bg-neutral-900">
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-sidebar-border/70 text-xs uppercase text-muted-foreground">

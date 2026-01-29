@@ -17,7 +17,10 @@ class PaymentRequest extends Model
         'expense_type_id',
         'expense_category_id',
         'requisites',
+        'requisites_file_url',
+        'requisites_file_uploaded_at',
         'amount',
+        'commission',
         'purchase_reference',
         'ready_for_payment',
         'paid',
@@ -29,6 +32,8 @@ class PaymentRequest extends Model
         'ready_for_payment' => 'boolean',
         'paid' => 'boolean',
         'amount' => 'decimal:2',
+        'commission' => 'decimal:2',
+        'requisites_file_uploaded_at' => 'datetime',
     ];
 
     public function author(): BelongsTo

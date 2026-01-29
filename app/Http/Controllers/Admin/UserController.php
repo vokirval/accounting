@@ -74,13 +74,19 @@ class UserController extends Controller
     public function destroy(User $user): RedirectResponse
     {
         $this->authorize('delete', $user);
+        $createdCount = $user->paymentRequests()->count();
+        $participantCount = $user->participatingPaymentRequests()->count();
+        $historyCount = $user->paymentRequestHistories()->count();
 
-        if (
-            $user->paymentRequests()->exists()
-            || $user->participatingPaymentRequests()->exists()
-            || $user->paymentRequestHistories()->exists()
-        ) {
-            return back()->withErrors(['user' => 'User has related records and cannot be deleted.']);
+        if ($createdCount > 0 || $participantCount > 0 || $historyCount > 0) {
+            return back()->withErrors([
+                'user' => sprintf(
+                    'Неможливо видалити користувача. Пов’язані записи: створені заявки: %d, участь у заявках: %d, історія змін: %d. Спочатку видаліть або змініть ці записи.',
+                    $createdCount,
+                    $participantCount,
+                    $historyCount,
+                ),
+            ]);
         }
 
         $user->delete();
