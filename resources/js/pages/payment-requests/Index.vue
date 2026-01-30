@@ -40,7 +40,7 @@ import {
 } from 'lucide-vue-next';
 
 type NamedItem = { id: number; name: string };
-type CategoryItem = { id: number; name: string; expense_type_id: number | null };
+type CategoryItem = { id: number; name: string; expense_type_id: number | string | null };
 
 
 
@@ -307,7 +307,7 @@ const filteredCategories = computed(() => {
         return props.value.expenseCategories;
     }
     return props.value.expenseCategories.filter(
-        (category) => category.expense_type_id === Number(form.expense_type_id),
+        (category) => Number(category.expense_type_id) === Number(form.expense_type_id),
     );
 });
 
@@ -316,7 +316,7 @@ const filteredFilterCategories = computed(() => {
         return props.value.expenseCategories;
     }
     return props.value.expenseCategories.filter(
-        (category) => category.expense_type_id === Number(filterForm.expense_type_id),
+        (category) => Number(category.expense_type_id) === Number(filterForm.expense_type_id),
     );
 });
 
