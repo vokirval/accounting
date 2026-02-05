@@ -393,7 +393,7 @@ class PaymentRequestController extends Controller
     private function storeReceiptFile(\Illuminate\Http\UploadedFile $file): string
     {
         $disk = $this->paymentFilesDisk();
-        $path = $file->store('receipts', $disk);
+        $path = $file->storeAs('receipts', $this->makeStoredFilename($file), $disk);
 
         return Storage::disk($disk)->url($path);
     }
@@ -401,7 +401,7 @@ class PaymentRequestController extends Controller
     private function storeRequisitesFile(\Illuminate\Http\UploadedFile $file): string
     {
         $disk = $this->paymentFilesDisk();
-        $path = $file->store('requisites', $disk);
+        $path = $file->storeAs('requisites', $this->makeStoredFilename($file), $disk);
 
         return Storage::disk($disk)->url($path);
     }
@@ -431,5 +431,15 @@ class PaymentRequestController extends Controller
         }
 
         Storage::disk($disk)->delete($path);
+    }
+
+    private function makeStoredFilename(\Illuminate\Http\UploadedFile $file): string
+    {
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if ($extension === '') {
+            $extension = strtolower((string) ($file->guessExtension() ?: 'bin'));
+        }
+
+        return sprintf('%s.%s', (string) Str::uuid(), $extension);
     }
 }

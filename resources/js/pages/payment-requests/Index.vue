@@ -1061,7 +1061,7 @@ const copyValue = async (value: unknown, label: string) => {
                                     <Label>Файл реквізитів</Label>
                                     <Input
                                         type="file"
-                                        accept=".xls,.xlsx,.csv,.pdf,.jpg,.jpeg,.png,.webp"
+                                        accept=".xls,.xlsx,.csv,.pdf,.p7m,.jpg,.jpeg,.png,.webp"
                                         @change="onRequisitesFileChange"
                                     />
                                     <span v-if="form.errors.requisites_file" class="text-sm text-red-600">{{ form.errors.requisites_file }}</span>
@@ -1140,7 +1140,7 @@ const copyValue = async (value: unknown, label: string) => {
                                     </div>
                                     <div v-else class="grid gap-2 md:col-span-2">
                                         <Label>Файл квитанції (PDF)</Label>
-                                        <Input type="file" accept=".pdf" @change="onReceiptFileChange" />
+                                        <Input type="file" accept=".pdf,.p7m" @change="onReceiptFileChange" />
                                         <span v-if="form.errors.receipt_file" class="text-sm text-red-600">{{ form.errors.receipt_file }}</span>
                                         <p v-if="selected?.receipt_url" class="text-xs text-muted-foreground">
                                             Поточний файл/посилання:
