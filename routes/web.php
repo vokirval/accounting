@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ExpenseTypeController;
+use App\Http\Controllers\Admin\AutoRuleController;
 use App\Http\Controllers\Admin\PaymentAccountController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PaymentRequestController;
@@ -28,6 +29,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('payment-accounts', [PaymentAccountController::class, 'store'])->name('admin.payment-accounts.store');
         Route::put('payment-accounts/{paymentAccount}', [PaymentAccountController::class, 'update'])->name('admin.payment-accounts.update');
         Route::delete('payment-accounts/{paymentAccount}', [PaymentAccountController::class, 'destroy'])->name('admin.payment-accounts.destroy');
+
+        Route::get('auto-rules', [AutoRuleController::class, 'index'])->name('admin.auto-rules.index');
+        Route::post('auto-rules', [AutoRuleController::class, 'store'])->name('admin.auto-rules.store');
+        Route::put('auto-rules/{autoRule}', [AutoRuleController::class, 'update'])->name('admin.auto-rules.update');
+        Route::delete('auto-rules/{autoRule}', [AutoRuleController::class, 'destroy'])->name('admin.auto-rules.destroy');
 
         Route::get('users', [UserController::class, 'index'])->name('admin.users.index');
         Route::post('users', [UserController::class, 'store'])->name('admin.users.store');

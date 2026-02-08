@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseType;
+use App\Models\AutoRule;
 use App\Models\PaymentAccount;
 use App\Models\PaymentRequest;
 use App\Models\User;
@@ -36,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(PaymentRequest::class, PaymentRequestPolicy::class);
         Gate::policy(ExpenseType::class, AdminOnlyPolicy::class);
         Gate::policy(ExpenseCategory::class, AdminOnlyPolicy::class);
+        Gate::policy(AutoRule::class, AdminOnlyPolicy::class);
         Gate::policy(PaymentAccount::class, AdminOnlyPolicy::class);
         Gate::policy(User::class, AdminOnlyPolicy::class);
         Gate::define('admin', fn (User $user): bool => $user->isAdmin());

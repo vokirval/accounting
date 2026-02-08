@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { CreditCard, FileText, Shapes, Users } from 'lucide-vue-next';
+import { CalendarClock, CreditCard, FileText, Shapes, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -36,6 +36,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                 title: 'Типи витрат',
                 href: '/admin/expense-types',
                 icon: Shapes,
+            },
+            {
+                title: 'Автоправила',
+                href: '/admin/auto-rules',
+                icon: CalendarClock,
             },
             {
                 title: 'Рахунки для оплати',

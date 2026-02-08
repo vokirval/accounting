@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('payment-requests:prune-requisites')
     ->dailyAt('02:00')
     ->withoutOverlapping();
+
+Schedule::command('auto-rules:run')
+    ->everyMinute()
+    ->withoutOverlapping();
