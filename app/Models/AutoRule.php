@@ -93,7 +93,7 @@ class AutoRule extends Model
 
             $candidate = $fromLocal->copy()->setTimeFromTimeString($runAt);
             if ($candidate->lessThanOrEqualTo($fromLocal)) {
-                $candidate->addDay();
+                $candidate = $candidate->addDay();
             }
 
             return $candidate->setTimezone('UTC');
@@ -128,7 +128,7 @@ class AutoRule extends Model
                 if (in_array($dayIso, $days, true) && $candidate->greaterThan($fromLocal)) {
                     return $candidate->copy()->setTimezone('UTC');
                 }
-                $candidate->addDay()->setTimeFromTimeString($runAt);
+                $candidate = $candidate->addDay()->setTimeFromTimeString($runAt);
             }
 
             return null;
@@ -146,11 +146,11 @@ class AutoRule extends Model
 
             $candidate = $fromLocal->copy()->setTimeFromTimeString($runAt);
             $candidateDay = min($dayOfMonth, $candidate->daysInMonth);
-            $candidate->setDay($candidateDay);
+            $candidate = $candidate->setDay($candidateDay);
             if ($candidate->lessThanOrEqualTo($fromLocal)) {
-                $candidate->addMonthNoOverflow();
+                $candidate = $candidate->addMonthNoOverflow();
                 $candidateDay = min($dayOfMonth, $candidate->daysInMonth);
-                $candidate->setDay($candidateDay);
+                $candidate = $candidate->setDay($candidateDay);
             }
 
             return $candidate->setTimezone('UTC');

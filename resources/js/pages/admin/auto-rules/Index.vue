@@ -140,7 +140,7 @@ const openCreate = () => {
     form.interval_days = 3;
     form.days_of_week = [];
     form.day_of_month = '';
-    form.start_date = new Date().toISOString().slice(0, 10);
+    form.start_date = formatDateKey(new Date());
     form.run_at = '09:00';
     form.timezone = props.value.timezone ?? 'Europe/Kyiv';
     form.is_active = true;
@@ -225,6 +225,7 @@ const buildOccurrences = () => {
 
     const occurrences = new Set<string>();
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const limit = new Date(today.getFullYear(), 11, 31);
 
     const dayOfMonth = Number(form.day_of_month) || startDate.getDate();
@@ -286,7 +287,7 @@ const buildOccurrences = () => {
 
 const occurrences = computed(() => buildOccurrences());
 
-const calendarPlaceholder = ref(parseDate(new Date().toISOString().slice(0, 10)));
+const calendarPlaceholder = ref(parseDate(formatDateKey(new Date())));
 
 const calendarSelection = computed(() => {
     const dates = Array.from(occurrences.value).map((value) => parseDate(value));
