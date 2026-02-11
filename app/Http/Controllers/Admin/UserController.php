@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UserStoreRequest;
 use App\Http\Requests\Admin\UserUpdateRequest;
+use App\Models\ExpenseType;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
@@ -19,8 +20,26 @@ class UserController extends Controller
 
         return Inertia::render('admin/users/Index', [
             'users' => User::query()
+                ->with(['editableExpenseTypes:id'])
                 ->orderBy('name')
-                ->get(['id', 'name', 'email', 'role', 'blocked_at']),
+                ->get(['id', 'name', 'email', 'role', 'blocked_at'])
+                ->map(function (User $user): array {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                        'blocked_at' => $user->blocked_at,
+                        'editable_expense_type_ids' => $user->editableExpenseTypes
+                            ->pluck('id')
+                            ->map(fn ($id) => (int) $id)
+                            ->values()
+                            ->all(),
+                    ];
+                }),
+            'expenseTypes' => ExpenseType::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -29,9 +48,12 @@ class UserController extends Controller
         $this->authorize('create', User::class);
 
         $data = $request->validated();
+        $editableExpenseTypeIds = $data['editable_expense_type_ids'] ?? [];
+        unset($data['editable_expense_type_ids']);
         $data['password'] = Hash::make($data['password']);
 
-        User::create($data);
+        $user = User::create($data);
+        $user->editableExpenseTypes()->sync($editableExpenseTypeIds);
 
         return back();
     }
@@ -41,6 +63,8 @@ class UserController extends Controller
         $this->authorize('update', $user);
 
         $data = $request->validated();
+        $editableExpenseTypeIds = $data['editable_expense_type_ids'] ?? [];
+        unset($data['editable_expense_type_ids']);
 
         if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -49,6 +73,7 @@ class UserController extends Controller
         }
 
         $user->update($data);
+        $user->editableExpenseTypes()->sync($editableExpenseTypeIds);
 
         return back();
     }

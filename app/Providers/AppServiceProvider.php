@@ -9,6 +9,8 @@ use App\Models\PaymentAccount;
 use App\Models\PaymentRequest;
 use App\Models\User;
 use App\Policies\AdminOnlyPolicy;
+use App\Policies\AutoRulePolicy;
+use App\Policies\ExpenseTypePolicy;
 use App\Policies\PaymentRequestPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -35,9 +37,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         Gate::policy(PaymentRequest::class, PaymentRequestPolicy::class);
-        Gate::policy(ExpenseType::class, AdminOnlyPolicy::class);
+        Gate::policy(ExpenseType::class, ExpenseTypePolicy::class);
         Gate::policy(ExpenseCategory::class, AdminOnlyPolicy::class);
-        Gate::policy(AutoRule::class, AdminOnlyPolicy::class);
+        Gate::policy(AutoRule::class, AutoRulePolicy::class);
         Gate::policy(PaymentAccount::class, AdminOnlyPolicy::class);
         Gate::policy(User::class, AdminOnlyPolicy::class);
         Gate::define('admin', fn (User $user): bool => $user->isAdmin());

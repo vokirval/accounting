@@ -14,14 +14,18 @@ type Item = { id: number; name: string; categories: Category[] };
 
 type PageProps = AppPageProps<{
     items: Item[];
+    permissions: {
+        manage_types: boolean;
+    };
 }>;
 
 const page = usePage<PageProps>();
 const props = computed(() => page.props);
 const errors = computed(() => (props.value.errors ?? {}) as Record<string, string>);
+const canManageTypes = computed(() => props.value.permissions.manage_types === true);
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Адмін', href: '/admin/users' },
+    { title: 'Платіжні заявки', href: '/payment-requests' },
     { title: 'Типи витрат', href: '/admin/expense-types' },
 ];
 
@@ -155,7 +159,7 @@ const removeCategory = (type: Item, category: Category) => {
                     <h1 class="text-xl font-semibold">Типи витрат</h1>
                     <p class="text-sm text-muted-foreground">Налаштування типів та категорій витрат.</p>
                 </div>
-                <Button size="sm" @click="openCreate">Створити тип</Button>
+                <Button v-if="canManageTypes" size="sm" @click="openCreate">Створити тип</Button>
             </div>
             <div
                 v-if="errors.delete || errors.delete_category"
@@ -176,8 +180,8 @@ const removeCategory = (type: Item, category: Category) => {
                             <Badge variant="outline" class="text-[11px]">Категорії: {{ item.categories.length }}</Badge>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" @click="openEdit(item)">Редагувати</Button>
-                            <Button size="sm" variant="destructive" @click="remove(item)">Видалити</Button>
+                            <Button v-if="canManageTypes" size="sm" variant="outline" @click="openEdit(item)">Редагувати</Button>
+                            <Button v-if="canManageTypes" size="sm" variant="destructive" @click="remove(item)">Видалити</Button>
                         </div>
                     </div>
 

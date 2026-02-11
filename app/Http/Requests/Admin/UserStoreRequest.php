@@ -19,6 +19,8 @@ class UserStoreRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', Password::defaults()],
             'role' => ['required', 'string', 'in:user,accountant,admin'],
+            'editable_expense_type_ids' => ['nullable', 'array'],
+            'editable_expense_type_ids.*' => ['integer', 'exists:expense_types,id'],
         ];
     }
 }

@@ -18,14 +18,25 @@ class ExpenseTypeController extends Controller
     public function index(): Response
     {
         $this->authorize('viewAny', ExpenseType::class);
+        $user = request()->user();
+
+        $itemsQuery = ExpenseType::query()
+            ->with(['categories' => function ($query) {
+                $query->orderBy('name');
+            }])
+            ->orderBy('name');
+
+        if (! $user->isAdmin()) {
+            $itemsQuery->whereHas('editors', function ($query) use ($user): void {
+                $query->where('users.id', $user->id);
+            });
+        }
 
         return Inertia::render('admin/expense-types/Index', [
-            'items' => ExpenseType::query()
-                ->with(['categories' => function ($query) {
-                    $query->orderBy('name');
-                }])
-                ->orderBy('name')
-                ->get(),
+            'items' => $itemsQuery->get(),
+            'permissions' => [
+                'manage_types' => $user->isAdmin(),
+            ],
         ]);
     }
 
@@ -71,7 +82,7 @@ class ExpenseTypeController extends Controller
 
     public function storeCategory(ExpenseCategoryStoreRequest $request, ExpenseType $expenseType): RedirectResponse
     {
-        $this->authorize('update', $expenseType);
+        $this->authorize('manageCategories', $expenseType);
 
         $expenseType->categories()->create($request->validated());
 
@@ -83,7 +94,7 @@ class ExpenseTypeController extends Controller
         ExpenseType $expenseType,
         ExpenseCategory $expenseCategory
     ): RedirectResponse {
-        $this->authorize('update', $expenseType);
+        $this->authorize('manageCategories', $expenseType);
 
         $category = $expenseType->categories()->whereKey($expenseCategory->id)->firstOrFail();
         $category->update($request->validated());
@@ -93,7 +104,7 @@ class ExpenseTypeController extends Controller
 
     public function destroyCategory(ExpenseType $expenseType, ExpenseCategory $expenseCategory): RedirectResponse
     {
-        $this->authorize('update', $expenseType);
+        $this->authorize('manageCategories', $expenseType);
 
         $category = $expenseType->categories()->whereKey($expenseCategory->id)->firstOrFail();
         $requestCount = $category->paymentRequests()->count();

@@ -70,6 +70,16 @@ class User extends Authenticatable
         return $this->hasMany(PaymentRequestHistory::class);
     }
 
+    public function editableExpenseTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ExpenseType::class,
+            'expense_type_user_permissions',
+            'user_id',
+            'expense_type_id',
+        );
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

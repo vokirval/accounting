@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ type AutoRule = {
     next_run_at: string | null;
     last_run_at: string | null;
     is_active: boolean;
+    creator?: NamedItem | null;
     expense_type?: NamedItem | null;
     expense_category?: NamedItem | null;
 };
@@ -55,10 +56,14 @@ type AutoRuleLog = {
 };
 
 type CategoryItem = { id: number; name: string; expense_type_id: number | string | null };
+type Pagination<T> = {
+    data: T[];
+    links: { url: string | null; label: string; active: boolean }[];
+};
 
 type PageProps = AppPageProps<{
     items: AutoRule[];
-    logs: AutoRuleLog[];
+    logs: Pagination<AutoRuleLog>;
     expenseTypes: NamedItem[];
     expenseCategories: CategoryItem[];
     timezone: string;
@@ -69,7 +74,7 @@ const props = computed(() => page.props);
 const errors = computed(() => (props.value.errors ?? {}) as Record<string, string>);
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Адмін', href: '/admin/users' },
+    { title: 'Платіжні заявки', href: '/payment-requests' },
     { title: 'Автоправила', href: '/admin/auto-rules' },
 ];
 
@@ -338,7 +343,10 @@ const calendarSelection = computed(() => {
                                     <div class="text-xs text-muted-foreground">
                                         {{ item.expense_type?.name ?? '—' }} · {{ item.expense_category?.name ?? '—' }}
                                     </div>
-                                    <div class="mt-1 text-xs text-muted-foreground">
+                                    <div class="mt-2 text-xs text-muted-foreground">
+                                        Створив: {{ item.creator?.name ?? '—' }}
+                                    </div>
+                                    <div class="mt-2 text-xs text-muted-foreground">
                                         Наступний запуск: {{ item.next_run_at ? new Date(item.next_run_at).toLocaleString('uk-UA') : '—' }}
                                     </div>
                                 </div>
@@ -367,7 +375,7 @@ const calendarSelection = computed(() => {
                 <div class="rounded-xl border border-sidebar-border/70 bg-white p-4 dark:border-sidebar-border dark:bg-neutral-900">
                     <h2 class="text-base font-semibold">Логи</h2>
                     <div class="mt-4 space-y-3 text-xs">
-                        <div v-for="log in props.logs" :key="log.id" class="rounded-lg border border-sidebar-border/60 p-3">
+                        <div v-for="log in props.logs.data" :key="log.id" class="rounded-lg border border-sidebar-border/60 p-3">
                             <div class="flex items-center justify-between">
                                 <span class="font-medium">{{ log.rule?.name ?? 'Правило видалено' }}</span>
                                 <Badge :variant="log.level === 'error' ? 'destructive' : 'secondary'">
@@ -377,8 +385,24 @@ const calendarSelection = computed(() => {
                             <div class="mt-1 text-muted-foreground">{{ log.message }}</div>
                             <div class="mt-1 text-[11px] text-muted-foreground">{{ new Date(log.created_at).toLocaleString('uk-UA') }}</div>
                         </div>
-                        <div v-if="props.logs.length === 0" class="text-sm text-muted-foreground">
+                        <div v-if="props.logs.data.length === 0" class="text-sm text-muted-foreground">
                             Логів поки що немає.
+                        </div>
+                        <div v-if="props.logs.links.length > 3" class="flex flex-wrap items-center gap-2 pt-2 text-xs">
+                            <template v-for="(link, index) in props.logs.links" :key="`log-page-${index}`">
+                                <Link
+                                    v-if="link.url"
+                                    :href="link.url"
+                                    class="rounded-md border border-input px-2 py-1"
+                                    :class="link.active ? 'bg-muted font-semibold' : 'text-muted-foreground'"
+                                    v-html="link.label"
+                                />
+                                <span
+                                    v-else
+                                    class="rounded-md border border-input px-2 py-1 text-muted-foreground opacity-60"
+                                    v-html="link.label"
+                                />
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -536,7 +560,7 @@ const calendarSelection = computed(() => {
                                             :week-starts-on="1"
                                             weekday-format="short"
                                             locale="uk-UA"
-                                            class="auto-rules-calendar w-fit max-w-[340px]"
+                                            class="auto-rules-calendar w-fit max-w-85"
                                         />
                                     </div>
                                 </div>

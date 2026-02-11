@@ -13,6 +13,9 @@ export type User = {
 
 export type Auth = {
     user: User;
+    permissions?: {
+        manage_expense_types?: boolean;
+    };
 };
 
 export type TwoFactorConfigContent = {

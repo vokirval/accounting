@@ -19,6 +19,9 @@ import AppLogo from './AppLogo.vue';
 
 const page = usePage();
 const role = computed(() => page.props.auth.user.role);
+const canManageExpenseTypes = computed(
+    () => page.props.auth.permissions?.manage_expense_types === true,
+);
 const homeHref = '/payment-requests';
 
 const mainNavItems = computed<NavItem[]>(() => {
@@ -28,20 +31,23 @@ const mainNavItems = computed<NavItem[]>(() => {
             href: homeHref,
             icon: FileText,
         },
+        {
+            title: 'Автоправила',
+            href: '/admin/auto-rules',
+            icon: CalendarClock,
+        },
     ];
+
+    if (canManageExpenseTypes.value) {
+        items.push({
+            title: 'Типи витрат',
+            href: '/admin/expense-types',
+            icon: Shapes,
+        });
+    }
 
     if (role.value === 'admin') {
         items.push(
-            {
-                title: 'Типи витрат',
-                href: '/admin/expense-types',
-                icon: Shapes,
-            },
-            {
-                title: 'Автоправила',
-                href: '/admin/auto-rules',
-                icon: CalendarClock,
-            },
             {
                 title: 'Рахунки для оплати',
                 href: '/admin/payment-accounts',

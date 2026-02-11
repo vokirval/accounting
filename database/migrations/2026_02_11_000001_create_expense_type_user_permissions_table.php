@@ -1,0 +1,25 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('expense_type_user_permissions', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('expense_type_id')->constrained()->cascadeOnDelete();
+            $table->timestamps();
+
+            $table->unique(['user_id', 'expense_type_id'], 'expense_type_user_permissions_unique');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('expense_type_user_permissions');
+    }
+};

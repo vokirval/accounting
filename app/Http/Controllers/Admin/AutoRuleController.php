@@ -20,17 +20,31 @@ class AutoRuleController extends Controller
     public function index(): Response
     {
         $this->authorize('viewAny', AutoRule::class);
+        $user = request()->user();
+
+        $itemsQuery = AutoRule::query()
+            ->with(['expenseType:id,name', 'expenseCategory:id,name', 'creator:id,name'])
+            ->orderByDesc('created_at');
+
+        if (! $user->isAdmin()) {
+            $itemsQuery->where('user_id', $user->id);
+        }
+
+        $logsQuery = AutoRuleLog::query()
+            ->with('rule:id,name,user_id')
+            ->orderByDesc('created_at');
+
+        if (! $user->isAdmin()) {
+            $logsQuery->whereHas('rule', function ($query) use ($user): void {
+                $query->where('user_id', $user->id);
+            });
+        }
 
         return Inertia::render('admin/auto-rules/Index', [
-            'items' => AutoRule::query()
-                ->with(['expenseType:id,name', 'expenseCategory:id,name'])
-                ->orderByDesc('created_at')
-                ->get(),
-            'logs' => AutoRuleLog::query()
-                ->with('rule:id,name')
-                ->orderByDesc('created_at')
-                ->limit(200)
-                ->get(),
+            'items' => $itemsQuery->get(),
+            'logs' => $logsQuery
+                ->paginate(50, ['*'], 'logs_page')
+                ->withQueryString(),
             'expenseTypes' => ExpenseType::query()->orderBy('name')->get(['id', 'name']),
             'expenseCategories' => ExpenseCategory::query()->orderBy('name')->get(['id', 'name', 'expense_type_id']),
             'timezone' => 'Europe/Kyiv',

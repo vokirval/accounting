@@ -47,6 +47,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const page = usePage();
 const auth = computed(() => page.props.auth);
+const canManageExpenseTypes = computed(
+    () => auth.value?.permissions?.manage_expense_types === true,
+);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 const homeHref = '/payment-requests';
 
@@ -62,17 +65,20 @@ const mainNavItems = computed<NavItem[]>(() => {
         },
     ];
 
+    if (canManageExpenseTypes.value) {
+        items.push({
+            title: 'Типи витрат',
+            href: '/admin/expense-types',
+            icon: Shapes,
+        });
+    }
+
     if (auth.value?.user?.role === 'admin') {
-            items.push(
-                {
-                    title: 'Типи витрат',
-                    href: '/admin/expense-types',
-                    icon: Shapes,
-                },
-                {
-                    title: 'Рахунки для оплати',
-                    href: '/admin/payment-accounts',
-                    icon: CreditCard,
+        items.push(
+            {
+                title: 'Рахунки для оплати',
+                href: '/admin/payment-accounts',
+                icon: CreditCard,
             },
             {
                 title: 'Користувачі',

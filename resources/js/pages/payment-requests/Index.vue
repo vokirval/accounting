@@ -873,7 +873,7 @@ const copyValue = async (value: unknown, label: string) => {
                                 <td v-if="columnVisibility.receipt_url" class="px-3 py-2">
                                     <div v-if="item.receipt_url" class="flex items-center gap-2">
                                         <Check class="h-4 w-4 text-green-600" />
-                                        <template v-if="!isUser">
+                                        
                                             <div class="group inline-flex items-center gap-1">
                                                 <TooltipProvider :delay-duration="100">
                                                     <Tooltip>
@@ -896,7 +896,7 @@ const copyValue = async (value: unknown, label: string) => {
                                                     <Clipboard class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                 </button>
                                             </div>
-                                        </template>
+                                        
                                     </div>
                                     <span v-else class="text-muted-foreground">—</span>
                                 </td>

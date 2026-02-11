@@ -15,10 +15,17 @@ type UserRow = {
     email: string;
     role: 'user' | 'accountant' | 'admin';
     blocked_at: string | null;
+    editable_expense_type_ids: number[];
+};
+
+type ExpenseTypeOption = {
+    id: number;
+    name: string;
 };
 
 type PageProps = AppPageProps<{
     users: UserRow[];
+    expenseTypes: ExpenseTypeOption[];
 }>;
 
 const page = usePage<PageProps>();
@@ -39,6 +46,7 @@ const form = useForm({
     email: '',
     role: 'user',
     password: '',
+    editable_expense_type_ids: [] as number[],
 });
 
 const openCreate = () => {
@@ -46,6 +54,7 @@ const openCreate = () => {
     selected.value = null;
     form.reset();
     form.clearErrors();
+    form.editable_expense_type_ids = [];
     dialogOpen.value = true;
 };
 
@@ -56,8 +65,18 @@ const openEdit = (user: UserRow) => {
     form.email = user.email;
     form.role = user.role;
     form.password = '';
+    form.editable_expense_type_ids = [...(user.editable_expense_type_ids ?? [])];
     form.clearErrors();
     dialogOpen.value = true;
+};
+
+const toggleExpenseTypeAccess = (expenseTypeId: number) => {
+    if (form.editable_expense_type_ids.includes(expenseTypeId)) {
+        form.editable_expense_type_ids = form.editable_expense_type_ids.filter((id) => id !== expenseTypeId);
+        return;
+    }
+
+    form.editable_expense_type_ids = [...form.editable_expense_type_ids, expenseTypeId];
 };
 
 const submit = () => {
@@ -211,6 +230,30 @@ const removeUser = (user: UserRow) => {
                             <option value="admin">Адміністратор</option>
                         </select>
                         <span v-if="form.errors.role" class="text-sm text-red-600">{{ form.errors.role }}</span>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label>Доступ до типів витрат (категорії)</Label>
+                        <div class="max-h-40 space-y-2 overflow-y-auto rounded-md border border-input p-3">
+                            <label
+                                v-for="expenseType in props.expenseTypes"
+                                :key="expenseType.id"
+                                class="flex items-center gap-2 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4"
+                                    :checked="form.editable_expense_type_ids.includes(expenseType.id)"
+                                    @change="toggleExpenseTypeAccess(expenseType.id)"
+                                />
+                                <span>{{ expenseType.name }}</span>
+                            </label>
+                            <p v-if="props.expenseTypes.length === 0" class="text-xs text-muted-foreground">
+                                Типи витрат відсутні.
+                            </p>
+                        </div>
+                        <span v-if="form.errors.editable_expense_type_ids" class="text-sm text-red-600">
+                            {{ form.errors.editable_expense_type_ids }}
+                        </span>
                     </div>
                     <div class="grid gap-2">
                         <Label>Пароль</Label>
