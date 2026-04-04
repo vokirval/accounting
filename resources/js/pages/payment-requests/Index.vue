@@ -5,6 +5,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import FileDropzone from '@/components/FileDropzone.vue';
 import {
     Collapsible,
     CollapsibleContent,
@@ -65,6 +66,7 @@ type PaymentRequestRow = {
     amount: string;
     commission: string | null;
     purchase_reference: string | null;
+    comment: string | null;
     ready_for_payment: boolean;
     paid: boolean;
     paid_account_id: number | null;
@@ -216,6 +218,7 @@ const columnVisibility = reactive({
     expense_type: true,
     expense_category: true,
     requisites: true,
+    comment: true,
     amount: true,
     purchase_reference: true,
     paid_account: true,
@@ -231,6 +234,7 @@ const columnItems: { key: keyof typeof columnVisibility; label: string }[] = [
     { key: 'expense_type', label: 'Тип витрат' },
     { key: 'expense_category', label: 'Категорія витрат' },
     { key: 'requisites', label: 'Реквізити' },
+    { key: 'comment', label: 'Коментар' },
     { key: 'amount', label: 'Сума/Комісія' },
     { key: 'purchase_reference', label: '№ Закупки' },
     { key: 'paid_account', label: 'Рахунок' },
@@ -253,6 +257,7 @@ const form = useForm({
     amount: '',
     commission: '' as string | '',
     purchase_reference: '',
+    comment: '',
     paid_account_id: '' as number | '',
     ready_for_payment: false,
     paid: false,
@@ -270,6 +275,7 @@ const resetFormState = () => {
     form.receipt_url = '';
     form.receipt_file = null;
     form.requisites_file = null;
+    form.comment = '';
     receiptMode.value = 'url';
     isEditing.value = false;
     selected.value = null;
@@ -295,6 +301,7 @@ const historyFieldLabels: Record<string, string> = {
     amount: 'Сума',
     commission: 'Комісія',
     purchase_reference: 'Номер з таблиці по закупці',
+    comment: 'Коментар',
     ready_for_payment: 'Готово до оплати',
     paid: 'Оплачено',
     paid_account_id: 'Рахунок оплати',
@@ -329,7 +336,10 @@ const selectedExpenseType = computed(() => {
     );
 });
 
-const showPurchaseReference = computed(() => selectedExpenseType.value?.name === 'Оплата за товар');
+const showPurchaseReference = computed(() => {
+    const expenseTypeName = selectedExpenseType.value?.name;
+    return expenseTypeName === 'Оплата за товар' || expenseTypeName === 'Передплата за товар';
+});
 
 const formatHistoryValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') {
@@ -428,6 +438,7 @@ const openEdit = (item: PaymentRequestRow) => {
     form.amount = item.amount ?? '';
     form.commission = item.commission ?? '';
     form.purchase_reference = item.purchase_reference ?? '';
+    form.comment = item.comment ?? '';
     form.paid_account_id = item.paid_account_id ?? '';
     form.ready_for_payment = toBool(item.ready_for_payment);
     form.paid = toBool(item.paid);
@@ -523,16 +534,6 @@ const clearFilters = () => {
     filterForm.created_to = '';
     filterForm.per_page = 30;
     applyFilters();
-};
-
-const onReceiptFileChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    form.receipt_file = target.files?.[0] ?? null;
-};
-
-const onRequisitesFileChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    form.requisites_file = target.files?.[0] ?? null;
 };
 
 const copyReceiptUrl = async (url: string) => {
@@ -695,6 +696,7 @@ const copyValue = async (value: unknown, label: string) => {
                                 <th v-if="columnVisibility.expense_type" class="px-3 py-2 whitespace-nowrap">Тип витрат</th>
                                 <th v-if="columnVisibility.expense_category" class="px-3 py-2 whitespace-nowrap">Категорія витрат</th>
                                 <th v-if="columnVisibility.requisites" class="px-3 py-2">Реквізити</th>
+                                <th v-if="columnVisibility.comment" class="px-3 py-2">Коментар</th>
                                 <th v-if="columnVisibility.amount" class="px-3 py-2">Сума / Комісія</th>
                                 <th v-if="columnVisibility.purchase_reference" class="px-3 py-2 whitespace-nowrap">№ Закупки</th>
                                 <!--<th class="px-3 py-2 whitespace-nowrap">Готово до оплати</th>-->
@@ -796,6 +798,22 @@ const copyValue = async (value: unknown, label: string) => {
                                                 </Tooltip>
                                             </TooltipProvider>
                                         </div>
+                                    </div>
+                                </td>
+                                <td v-if="columnVisibility.comment" class="px-3 py-2">
+                                    <div class="w-56 max-w-56">
+                                        <TooltipProvider :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <span class="block truncate text-muted-foreground">
+                                                        {{ item.comment ?? '—' }}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <span class="max-w-90 whitespace-pre-wrap text-xs">{{ item.comment ?? '—' }}</span>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                     </div>
                                 </td>
                                 <td v-if="columnVisibility.amount" class="px-3 py-2 font-medium">
@@ -1059,10 +1077,11 @@ const copyValue = async (value: unknown, label: string) => {
                                 </div>
                                 <div class="grid gap-2 md:col-span-1">
                                     <Label>Файл реквізитів</Label>
-                                    <Input
-                                        type="file"
+                                    <FileDropzone
+                                        v-model="form.requisites_file"
                                         accept=".xls,.xlsx,.csv,.pdf,.p7m,.jpg,.jpeg,.png,.webp"
-                                        @change="onRequisitesFileChange"
+                                        title="Перетягніть файл реквізитів"
+                                        hint="або натисніть, щоб обрати файл"
                                     />
                                     <span v-if="form.errors.requisites_file" class="text-sm text-red-600">{{ form.errors.requisites_file }}</span>
                                     <p v-if="selected?.requisites_file_url" class="text-xs text-muted-foreground">
@@ -1140,7 +1159,12 @@ const copyValue = async (value: unknown, label: string) => {
                                     </div>
                                     <div v-else class="grid gap-2 md:col-span-2">
                                         <Label>Файл квитанції (PDF)</Label>
-                                        <Input type="file" accept=".pdf,.p7m" @change="onReceiptFileChange" />
+                                        <FileDropzone
+                                            v-model="form.receipt_file"
+                                            accept=".pdf,.p7m"
+                                            title="Перетягніть файл квитанції"
+                                            hint="або натисніть, щоб обрати PDF/P7M"
+                                        />
                                         <span v-if="form.errors.receipt_file" class="text-sm text-red-600">{{ form.errors.receipt_file }}</span>
                                         <p v-if="selected?.receipt_url" class="text-xs text-muted-foreground">
                                             Поточний файл/посилання:
@@ -1148,6 +1172,17 @@ const copyValue = async (value: unknown, label: string) => {
                                         </p>
                                     </div>
                                 </template>
+
+                                <div class="grid gap-2 md:col-span-2">
+                                    <Label>Коментар</Label>
+                                    <textarea
+                                        v-model="form.comment"
+                                        rows="3"
+                                        class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        placeholder="Додатковий коментар до заявки"
+                                    />
+                                    <span v-if="form.errors.comment" class="text-sm text-red-600">{{ form.errors.comment }}</span>
+                                </div>
                             </div>
                         </div>
 

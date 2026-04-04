@@ -17,6 +17,10 @@ class AutoRuleStoreRequest extends FormRequest
         if ($this->has('requisites') && $this->input('requisites') === '') {
             $this->merge(['requisites' => null]);
         }
+
+        if ($this->has('comment') && $this->input('comment') === '') {
+            $this->merge(['comment' => null]);
+        }
     }
 
     public function rules(): array
@@ -40,6 +44,7 @@ class AutoRuleStoreRequest extends FormRequest
                 'max:10240',
             ],
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'comment' => ['nullable', 'string', 'max:2000'],
             'ready_for_payment' => ['nullable', 'boolean'],
             'frequency' => ['required', 'string', Rule::in(['once', 'daily', 'weekly', 'monthly', 'every_n_days'])],
             'interval_days' => ['nullable', 'integer', 'min:1', 'required_if:frequency,every_n_days'],
@@ -53,3 +58,4 @@ class AutoRuleStoreRequest extends FormRequest
         ];
     }
 }
+

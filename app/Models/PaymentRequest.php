@@ -22,6 +22,7 @@ class PaymentRequest extends Model
         'amount',
         'commission',
         'purchase_reference',
+        'comment',
         'ready_for_payment',
         'paid',
         'paid_account_id',
@@ -66,3 +67,4 @@ class PaymentRequest extends Model
         return $this->hasMany(PaymentRequestHistory::class);
     }
 }
+

@@ -21,6 +21,7 @@ class AutoRule extends Model
         'requisites',
         'requisites_file_url',
         'amount',
+        'comment',
         'ready_for_payment',
         'frequency',
         'interval_days',
@@ -159,3 +160,4 @@ class AutoRule extends Model
         return null;
     }
 }
+

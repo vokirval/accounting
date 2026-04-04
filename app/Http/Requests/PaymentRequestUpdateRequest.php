@@ -21,6 +21,10 @@ class PaymentRequestUpdateRequest extends FormRequest
         if ($this->has('commission') && $this->input('commission') === '') {
             $this->merge(['commission' => null]);
         }
+
+        if ($this->has('comment') && $this->input('comment') === '') {
+            $this->merge(['comment' => null]);
+        }
     }
 
     public function rules(): array
@@ -45,6 +49,7 @@ class PaymentRequestUpdateRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0.01'],
             'commission' => ['nullable', 'numeric', 'min:0'],
             'purchase_reference' => ['nullable', 'string', 'max:255'],
+            'comment' => ['nullable', 'string', 'max:2000'],
             'ready_for_payment' => ['nullable', 'boolean'],
             'paid' => ['nullable', 'boolean'],
             'paid_account_id' => ['nullable', 'integer', 'exists:payment_accounts,id'],
@@ -58,3 +63,4 @@ class PaymentRequestUpdateRequest extends FormRequest
         ];
     }
 }
+

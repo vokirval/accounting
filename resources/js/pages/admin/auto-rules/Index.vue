@@ -3,6 +3,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
+import FileDropzone from '@/components/FileDropzone.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,12 @@ import {
     DrawerHeader,
     DrawerTitle,
 } from '@/components/ui/drawer';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { parseDate } from '@internationalized/date';
 import type { AppPageProps, BreadcrumbItem } from '@/types';
 
@@ -30,6 +37,7 @@ type AutoRule = {
     requisites: string | null;
     requisites_file_url: string | null;
     amount: string;
+    comment: string | null;
     ready_for_payment: boolean;
     frequency: string;
     interval_days: number | null;
@@ -89,6 +97,7 @@ const form = useForm({
     requisites: '',
     requisites_file: null as File | null,
     amount: '',
+    comment: '',
     ready_for_payment: false,
     frequency: 'monthly',
     interval_days: 3 as number | '',
@@ -161,6 +170,7 @@ const openEdit = (item: AutoRule) => {
     form.requisites = item.requisites ?? '';
     form.requisites_file = null;
     form.amount = item.amount ?? '';
+    form.comment = item.comment ?? '';
     form.ready_for_payment = !!item.ready_for_payment;
     form.frequency = item.frequency;
     form.interval_days = item.interval_days ?? '';
@@ -365,6 +375,21 @@ const calendarSelection = computed(() => {
                                 <span>·</span>
                                 <span>Час: {{ item.run_at?.slice(0, 5) }}</span>
                             </div>
+                            <div class="mt-2 text-xs text-muted-foreground">
+                                <span class="mr-1 font-medium">Коментар:</span>
+                                <TooltipProvider :delay-duration="100">
+                                    <Tooltip>
+                                        <TooltipTrigger as-child>
+                                            <span class="inline-block w-80 max-w-full truncate align-bottom">
+                                                {{ item.comment ?? '—' }}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <span class="max-w-80 whitespace-pre-wrap text-xs">{{ item.comment ?? '—' }}</span>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
                         </div>
                         <div v-if="props.items.length === 0" class="text-sm text-muted-foreground">
                             Немає створених правил.
@@ -454,7 +479,12 @@ const calendarSelection = computed(() => {
                                     </div>
                                     <div class="grid gap-2">
                                         <Label>Файл реквізитів</Label>
-                                        <Input type="file" accept=".xls,.xlsx,.csv,.pdf,.p7m,.jpg,.jpeg,.png,.webp" @change="(e) => (form.requisites_file = (e.target as HTMLInputElement).files?.[0] ?? null)" />
+                                        <FileDropzone
+                                            v-model="form.requisites_file"
+                                            accept=".xls,.xlsx,.csv,.pdf,.p7m,.jpg,.jpeg,.png,.webp"
+                                            title="Перетягніть файл реквізитів"
+                                            hint="або натисніть, щоб обрати файл"
+                                        />
                                         <span v-if="form.errors.requisites_file" class="text-sm text-red-600">{{ form.errors.requisites_file }}</span>
                                         <p v-if="selected?.requisites_file_url" class="text-xs text-muted-foreground">
                                             Поточний файл:
@@ -563,6 +593,17 @@ const calendarSelection = computed(() => {
                                             class="auto-rules-calendar w-fit max-w-85"
                                         />
                                     </div>
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label>Коментар</Label>
+                                    <textarea
+                                        v-model="form.comment"
+                                        rows="3"
+                                        class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        placeholder="Додатковий коментар до автоправила"
+                                    />
+                                    <span v-if="form.errors.comment" class="text-sm text-red-600">{{ form.errors.comment }}</span>
                                 </div>
                             </div>
                         </div>
